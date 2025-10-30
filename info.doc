@@ -1,0 +1,276 @@
+1.vs code extension vscode-proto
+
+1.command to compile proto file for go lang is
+protoc --go-grpc_out=. --go-grpc_out=. *.proto
+
+Install protoc compiler
+sudo apt install -y protobuf-compiler
+protoc --version 
+
+
+Install the required Go plugins
+go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+
+Then ensure GOBIN (usually $HOME/go/bin) is in your PATH:
+export PATH="$PATH:$(go env GOPATH)/bin"
+
+
+
+basic synatx
+
+
+syntax = "proto3";->tells the Protocol Buffers compiler (protoc) that you’re using version 3 of the Protobuf syntax.
+
+package hello;-> your package name 
+
+option go_package = "grpc-hello/proto;hello";  // module name + package alias ->This is very important for Go.It defines where the generated .pb.go files belong in your Go module.
+
+--Defines a gRPC service think it like an API/interface
+--This tells protoc:“Generate Go code for a service that clients can call remotely.”
+--inside this we write rpc methods
+
+service HelloService {
+  rpc SayHello ->name (HelloRequest)->Request type returns (HelloResponse)->response type;
+}
+
+
+--This defines the data structure (message) sent by the client.
+--field tag used by protobuf internally for serialization.
+
+message HelloRequest {
+  string->field type name->field name = 1->field tag;
+}
+//Defines the data structure returned by the server.
+message HelloResponse {
+  string message = 1;
+}
+
+
+
+If your .proto file was:
+
+
+hello.proto
+
+Then protoc will produce:
+hello.pb.go
+hello_grpc.pb.go
+
+1.hello.pb.go
+
+Purpose:
+Contains the message types and basic serialization logic for your protobuf data.
+
+Inside this file you’ll find:
+
+    Go structs that match your .proto messages
+
+
+    type HelloRequest struct {
+        Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+    }
+
+
+    Methods to marshal/unmarshal data (convert between binary and Go structs)
+
+    Versioning info and protobuf reflection helpers
+
+So this file handles all the data model parts — how to represent, encode, and decode your protobuf messages.
+
+2.hello_grpc.pb.go
+
+Purpose:
+Contains all the gRPC service code — client and server stubs.
+
+Inside this file you’ll find:
+
+    An interface for your server to implement:
+
+   
+    type HelloServiceServer interface {
+        SayHello(context.Context, *HelloRequest) (*HelloResponse, error)
+    }
+
+    A client implementation to call the service:
+
+
+    
+    type HelloServiceClient interface {
+        SayHello(ctx context.Context, in *HelloRequest, opts ...grpc.CallOption) (*HelloResponse, error)
+    }
+
+    Helper functions to register your service:
+
+
+    func RegisterHelloServiceServer(s grpc.ServiceRegistrar, srv HelloServiceServer)
+
+
+
+
+In short:
+
+    hello.pb.go → Data
+
+    hello_grpc.pb.go → RPC communication (client/server code)
+
+
+
+Both files work together:
+
+    The client uses the generated client stub (from *_grpc.pb.go) to send HelloRequest messages (from *.pb.go).
+
+    The server implements the service interface (from *_grpc.pb.go) and receives those same messages.
+
+TL:DR;
+File	Contains	Used by	Purpose
+hello.pb.go	Message structs, encoding logic	Both	Defines data structures
+hello_grpc.pb.go	gRPC service interfaces & stubs	Both	Defines communication layer
+
+
+----------------------------------------------------------------------------------------------
+
+🧩 What Is a Stub?
+
+A stub is auto-generated code that acts as a middleman between your program and a remote service.
+
+In gRPC (and other RPC systems), stubs let your client and server talk to each other as if they were calling local functions — even though they’re actually communicating over the network.
+💭 Real-World Analogy
+
+Think of a stub like a delivery agent 📦:
+
+    You (the client) tell the delivery agent:
+    “Deliver this message to the server.”
+
+    The agent (stub) handles packing, transporting, and unpacking the message.
+
+    You don’t need to know how the network works — you just call a function.
+
+So the stub is your “network translator” — it hides all the low-level networking details.
+🔁 In gRPC There Are Two Types of Stubs
+Type	Used By	Purpose
+Client Stub	Client	Sends requests to the server (acts like a proxy for remote calls)
+Server Stub	Server	Receives incoming requests and passes them to your actual Go functions
+🖥️ Example from your project
+
+You defined this service in hello.proto:
+
+proto
+Copy code
+service HelloService {
+  rpc SayHello (HelloRequest) returns (HelloResponse);
+}
+
+When you run:
+
+bash
+Copy code
+protoc --go_out=. --go-grpc_out=. proto/hello.proto
+
+The compiler creates stubs in hello_grpc.pb.go:
+📡 1️⃣ Client Stub
+
+go
+Copy code
+type HelloServiceClient interface {
+    SayHello(ctx context.Context, in *HelloRequest, opts ...grpc.CallOption) (*HelloResponse, error)
+}
+
+This is your client stub interface.
+Then the implementation:
+
+go
+Copy code
+func (c *helloServiceClient) SayHello(ctx context.Context, in *HelloRequest, opts ...grpc.CallOption) (*HelloResponse, error) {
+    out := new(HelloResponse)
+    err := c.cc.Invoke(ctx, "/hello.HelloService/SayHello", in, out, opts...)
+    return out, err
+}
+
+👉 Here, c.cc.Invoke() handles:
+
+    Serializing HelloRequest
+
+    Sending it over HTTP/2
+
+    Waiting for the server’s reply
+
+    Deserializing HelloResponse
+
+You just call:
+
+go
+Copy code
+resp, _ := client.SayHello(ctx, &pb.HelloRequest{Name: "Saurabh"})
+
+and the stub does everything else under the hood.
+🧠 2️⃣ Server Stub
+
+go
+Copy code
+type HelloServiceServer interface {
+    SayHello(context.Context, *HelloRequest) (*HelloResponse, error)
+}
+
+When you implement your server, you write:
+
+go
+Copy code
+type helloServer struct {
+    pb.UnimplementedHelloServiceServer
+}
+
+func (s *helloServer) SayHello(ctx context.Context, req *pb.HelloRequest) (*pb.HelloResponse, error) {
+    return &pb.HelloResponse{Message: "Hello, " + req.Name + "!"}, nil
+}
+
+Then you register your server:
+
+go
+Copy code
+pb.RegisterHelloServiceServer(grpcServer, &helloServer{})
+
+✅ That Register... function connects your implementation with the generated server stub, which:
+
+    Receives binary data from the client
+
+    Deserializes it into HelloRequest
+
+    Calls your SayHello() function
+
+    Serializes and sends back HelloResponse
+
+
+
+
+
+
+
+defer(Delays a function call until the current function exits) call are extremely useful for releasing resources like:
+
+    Network connections
+
+    Files (defer file.Close())
+
+    Locks (defer mu.Unlock())
+
+    Database handles (defer db.Close())
+
+you open a network connection between the client and server.
+
+If you forget to close it, you’ll have:
+
+    Memory leaks,
+
+    Open TCP sockets,
+
+    Possible “too many open files” errors.
+to guarantee that when your function ends,
+the connection is gracefully closed — even if errors occur later.
+
+
+If you have multiple defer statements in a function,
+Go doesn’t run them immediately.
+Instead, it stores them in a stack 
+When the function ends, Go pops those deferred calls from the top of the stack —
+so the last one declared runs first.
