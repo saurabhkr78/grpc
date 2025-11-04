@@ -274,3 +274,32 @@ Go doesn’t run them immediately.
 Instead, it stores them in a stack 
 When the function ends, Go pops those deferred calls from the top of the stack —
 so the last one declared runs first.
+
+
+
+#_grpc.pb.go file Contains
+
+
+| Section                                    | Purpose                                                                      |
+| ------------------------------------------ | ---------------------------------------------------------------------------- |
+| **Client interface (`UserServiceClient`)** | What your Go client calls (e.g., `client.GetUser(...)`)                      |
+| **Server interface (`UserServiceServer`)** | What your Go server must implement                                           |
+| **Streaming helpers**                      | Code to handle client/server/bidirectional streaming                         |
+| **Register function**                      | `RegisterUserServiceServer()` used to register your service on a gRPC server |
+
+
+
+#When you build a gRPC project, you have 3 layers:
+
+
+user.proto          →  Protocol definition
+↓
+user.pb.go          →  Data structures (messages)
+user_grpc.pb.go     →  Service interface and network logic
+↓
+server/main.go      →  Your actual business logic (you implement the methods)
+client/main.go      →  Calls those methods
+
+
+
+#proto file is API contract that's all you Design 

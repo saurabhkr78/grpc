@@ -1,19 +1,76 @@
 syntax = "proto3";
 
-package hello;
+package user;
 
-option go_package = "./";  // module name + package alias
+// This path matches your go.mod module (grpc) + folder path (grpc/gen)
+/*
+
+
+    grpc → matches your Go module name from go.mod
+
+    /gen → matches where your generated files will live
+
+    ;gen → tells protoc the Go package alias name
+
+*/
+option go_package = "grpc/gen;gen";
 
 
 
-message HelloRequest {
+
+// ===========================================================
+// Service Definition
+// ===========================================================
+
+service UserService {
+  // Unary RPC — single request, single response
+  rpc GetUser (GetUserRequest) returns (GetUserResponse);
+
+  // Server streaming RPC — single request, multiple responses
+  rpc GetUsersStream (GetUsersRequest) returns (stream UserResponse);
+
+  // Client streaming RPC — multiple requests, single response
+  rpc CreateUsersStream (stream CreateUserRequest) returns (CreateUsersResponse);
+
+  // Bidirectional streaming RPC — multiple requests, multiple responses
+  rpc Chat (stream ChatMessage) returns (stream ChatMessage);
+}
+
+// ===========================================================
+// Message Definitions
+// ===========================================================
+
+message GetUserRequest {
+  int32 user_id = 1;
+}
+
+message GetUserResponse {
+  UserResponse user = 1;
+}
+
+message GetUsersRequest {
+  repeated string user_ids = 1;
+}
+
+message UserResponse {
+  string id = 1;
+  string name = 2;
+  string email = 3;
+  bool is_active = 4;
+}
+
+message CreateUserRequest {
   string name = 1;
+  string email = 2;
 }
 
-message HelloResponse {
-  string message = 1;
+message CreateUsersResponse {
+  int32 users_created = 1;
+  repeated string user_ids = 2;
 }
 
-service HelloService {
-  rpc SayHello (HelloRequest) returns (HelloResponse);
+message ChatMessage {
+  string user_id = 1;
+  string message = 2;
+  int64 timestamp = 3;
 }
