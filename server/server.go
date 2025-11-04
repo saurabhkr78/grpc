@@ -15,11 +15,6 @@ type server struct {
 	pb.UnimplementedHelloServiceServer
 }
 
-func (s *server) SayHello(ctx context.Context, req *pb.HelloRequest) (*pb.HelloResponse, error) {
-	log.Printf("Hello %s! Welcome to gRPC services.\n", req.Name)
-	return &pb.HelloResponse{Message: "Hello " + req.Name + "! Welcome to gRPC services."}, nil
-
-}
 func main() {
 	listener, err := net.Listen("tcp", ":50051")
 	if err != nil {
@@ -33,4 +28,10 @@ func main() {
 	if err := grpcServer.Serve(listener); err != nil {
 		log.Fatalf("Failed to serve: %v", err)
 	}
+}
+func (s *server) SayHello(ctx context.Context, req *pb.HelloRequest) (*pb.HelloResponse, error) {
+	log.Println("Received  request from client")
+	log.Printf("Hello %s! Welcome to gRPC server.\n", req.Name)
+	return &pb.HelloResponse{Message: "Hello " + req.Name + "! Welcome to gRPC services."}, nil
+
 }
